@@ -1,0 +1,25 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/frontend/index.html"
+    },
+    {
+      "source": "/chat",
+      "destination": "/frontend/chat.html"
+    },
+    {
+      "source": "/benefits",
+      "destination": "/frontend/benefits.html"
+    },
+    {
+      "source": "/donate",
+      "destination": "/frontend/donate.html"
+    },
+    {
+      "source": "/safe",
+      "destination": "/frontend/safe.html"
+    }
+  ]
+}

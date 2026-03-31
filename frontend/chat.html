@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Breastmilk AI Buddy - Chat</title>
+<link rel="stylesheet" href="chat.css">
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <div class="header-left">
+            <button class="back-btn" onclick="goHome()" aria-label="Go back">←</button>
+            <div class="bot-mark">🍼</div>
+            <div class="header-copy">
+                <h1>Care chat</h1>
+                <h2>Breastmilk AI Buddy</h2>
+            </div>
+        </div>
+        <div class="status-pill">Online</div>
+    </div>
+
+    <div class="chat-main">
+        <aside class="chat-sidebar">
+            <div class="welcome-card">
+                <strong>Ask a gentle, practical question.</strong>
+                <p>I can help with milk donation, safe storage, screening basics, and getting ready to donate.</p>
+            </div>
+
+            <div class="suggestions-panel">
+                <p class="suggestions-title">Try one of these</p>
+                <div class="suggestions">
+                    <button class="suggestion-chip" onclick="fillPrompt('What are the benefits of donating breast milk?')">Benefits of donating</button>
+                    <button class="suggestion-chip" onclick="fillPrompt('How should I store breast milk safely?')">Storage tips</button>
+                    <button class="suggestion-chip" onclick="fillPrompt('How do I donate breast milk to a milk bank?')">How to donate</button>
+                </div>
+            </div>
+        </aside>
+
+        <div class="chat-column">
+            <div class="chat-box" id="chatBox">
+                <div class="chat-thread" id="chatThread">
+                    <div class="bot-msg">Hi, I am here to help you with breast milk donation and safety.</div>
+                </div>
+            </div>
+
+            <div class="chat-input-wrap">
+                <p class="chat-input-label">Type your question below</p>
+                <div class="chat-input-bar">
+                    <input type="text" id="userMsg" placeholder="Ask me anything about breast milk donation..." />
+                    <button onclick="sendMsg()" aria-label="Send message">➜</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const API_BASE_URL =
+    window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost"
+        ? "http://localhost:5000"
+        : `${window.location.origin}/api`;
+const REQUEST_TIMEOUT_MS = 18000;
+
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+function formatInlineMarkdown(text) {
+    return text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+function renderMessageContent(text) {
+    const safeText = escapeHtml(text).replace(/\r\n/g, "\n");
+    const lines = safeText.split("\n");
+    const blocks = [];
+    let paragraphLines = [];
+    let listType = null;
+    let listItems = [];
+
+    function flushParagraph() {
+        if (!paragraphLines.length) return;
+        const paragraphHtml = paragraphLines
+            .map((line) => formatInlineMarkdown(line))
+            .join("<br>");
+        blocks.push(`<p>${paragraphHtml}</p>`);
+        paragraphLines = [];
+    }
+
+    function flushList() {
+        if (!listItems.length || !listType) return;
+        const itemsHtml = listItems
+            .map((item) => `<li>${formatInlineMarkdown(item)}</li>`)
+            .join("");
+        blocks.push(`<${listType}>${itemsHtml}</${listType}>`);
+        listType = null;
+        listItems = [];
+    }
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+
+        if (!line) {
+            flushParagraph();
+            flushList();
+            continue;
+        }
+
+        const numberedMatch = line.match(/^\d+\.\s+(.*)$/);
+        const bulletMatch = line.match(/^[-*]\s+(.*)$/);
+
+        if (numberedMatch) {
+            flushParagraph();
+            if (listType && listType !== "ol") flushList();
+            listType = "ol";
+            listItems.push(numberedMatch[1]);
+            continue;
+        }
+
+        if (bulletMatch) {
+            flushParagraph();
+            if (listType && listType !== "ul") flushList();
+            listType = "ul";
+            listItems.push(bulletMatch[1]);
+            continue;
+        }
+
+        flushList();
+        paragraphLines.push(line);
+    }
+
+    flushParagraph();
+    flushList();
+
+    return blocks.join("") || `<p>${formatInlineMarkdown(safeText)}</p>`;
+}
+
+function goHome() {
+    window.location.href = window.location.origin.includes("127.0.0.1") || window.location.origin.includes("localhost")
+        ? "index.html"
+        : "/";
+}
+
+function fillPrompt(text) {
+    const input = document.getElementById("userMsg");
+    input.value = text;
+    input.focus();
+}
+
+function loadHomepagePrompt() {
+    const savedPrompt = sessionStorage.getItem("breastmilkBuddyPrompt");
+
+    if (!savedPrompt) return;
+
+    sessionStorage.removeItem("breastmilkBuddyPrompt");
+    fillPrompt(savedPrompt);
+    sendMsg();
+}
+
+async function sendMsg() {
+    const box = document.getElementById("chatBox");
+    const thread = document.getElementById("chatThread");
+    const input = document.getElementById("userMsg");
+    const userText = input.value.trim();
+
+    if (!userText) return;
+
+    const userBubble = document.createElement("div");
+    userBubble.className = "user-msg";
+    userBubble.textContent = userText;
+    thread.appendChild(userBubble);
+
+    input.value = "";
+
+    const botBubble = document.createElement("div");
+    botBubble.className = "bot-msg";
+    botBubble.innerHTML = '<div class="message-content"><p>Thinking...</p></div>';
+    thread.appendChild(botBubble);
+
+    box.scrollTop = box.scrollHeight;
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+        const response = await fetch(`${API_BASE_URL}/chat`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ message: userText }),
+            signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        const data = await response.json();
+        botBubble.innerHTML = `<div class="message-content">${renderMessageContent(data.reply || "I could not find a reply just now.")}</div>`;
+        box.scrollTop = box.scrollHeight;
+    } catch (err) {
+        const errorText =
+            err.name === "AbortError"
+                ? "The request took too long. Please try again."
+                : "I cannot reach the backend right now. Please make sure the server is running on port 5000.";
+        botBubble.innerHTML = `<div class="message-content">${renderMessageContent(errorText)}</div>`;
+    }
+}
+
+document.getElementById("userMsg").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") sendMsg();
+});
+
+loadHomepagePrompt();
+</script>
+
+</body>
+</html>
