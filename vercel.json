@@ -1,5 +1,11 @@
 {
+  "version": 2,
   "cleanUrls": true,
+  "builds": [
+    { "src": "api/**/*.js", "use": "@vercel/node" },
+    { "src": "frontend/**", "use": "@vercel/static" },
+    { "src": "index.html", "use": "@vercel/static" }
+  ],
   "redirects": [
     {
       "source": "/",
@@ -7,22 +13,13 @@
       "permanent": false
     }
   ],
-  "rewrites": [
-    {
-      "source": "/chat",
-      "destination": "/frontend/chat.html"
-    },
-    {
-      "source": "/benefits",
-      "destination": "/frontend/benefits.html"
-    },
-    {
-      "source": "/donate",
-      "destination": "/frontend/donate.html"
-    },
-    {
-      "source": "/safe",
-      "destination": "/frontend/safe.html"
-    }
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/chat", "dest": "/frontend/chat.html" },
+    { "src": "/benefits", "dest": "/frontend/benefits.html" },
+    { "src": "/donate", "dest": "/frontend/donate.html" },
+    { "src": "/safe", "dest": "/frontend/safe.html" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/frontend/chat.html" }
   ]
 }
